@@ -6,6 +6,8 @@
 
 Zero-latency local MQTT event bridge for **TP-Link Tapo Video Doorbells** (Tapo D130, D235, and companion chimes).
 
+Inspired by the original concept from [debian-D235-Doorbell-Press-MQTT](https://github.com/AriaGen/debian-D235-Doorbell-Press-MQTT) by AriaGen.
+
 Captures the local UDP broadcast on port `20005` transmitted when the physical button is pressed and publishes instantaneous MQTT events for **Home Assistant** automations and **Scrypted / Apple HomeKit** doorbell chimes and camera popups.
 
 > [!TIP]
