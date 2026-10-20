@@ -1,39 +1,19 @@
-# TP-Link Tapo D235 Doorbell Press MQTT Sniffer
+# TP-Link Tapo Doorbell Press MQTT Sniffer
 
-Captures UDP broadcast events on port `20005` emitted when the **TP-Link Tapo D235** doorbell button is pressed, and publishes the event to an MQTT broker for instant Home Assistant integration with zero latency.
+[![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5.svg)](https://www.home-assistant.io/)
+[![Scrypted](https://img.shields.io/badge/Scrypted-HomeKit%20Chime-9b59b6.svg)](https://www.scrypted.app/)
 
----
+Zero-latency local MQTT event bridge for **TP-Link Tapo Video Doorbells** (Tapo D130, D235, and companion chimes).
 
-## Architecture & How It Works
+Captures the local UDP broadcast on port `20005` transmitted when the physical button is pressed and publishes instantaneous MQTT events for **Home Assistant** automations and **Scrypted / Apple HomeKit** doorbell chimes and camera popups.
 
-1. When someone presses the physical doorbell button, the Tapo D235 broadcasts a UDP packet on destination port **`20005`**.
-2. This service listens on UDP port `20005`, matches the doorbell's IP address (or accepts any if set to `auto`), and publishes:
-   - `on` to `doorbell/press`
-   - Sleeps for `PULSE_TIME` (default: 2s)
-   - `off` to `doorbell/press`
-3. Automatically publishes Home Assistant MQTT Discovery configuration, so Home Assistant creates a native `binary_sensor` with `device_class: doorbell` automatically.
-
-> [!IMPORTANT]
-> **Subnet / VLAN Note (e.g. IoT on `10.0.10.x` & Server on `10.0.0.x`):**
-> UDP broadcast packets do not traverse standard routers/subnets by default. If your doorbell is on an IoT VLAN and your Debian server is on your main LAN, enable a UDP broadcast relay on your router.
->
-> **Example for GL.iNet / OpenWrt routers:**
-> ```bash
-> # 1. Install relay package
-> opkg update && opkg install udp-broadcast-relay-redux
-> 
-> # 2. Run in background (relaying between br-lan and br-iot)
-> udp-broadcast-relay-redux --id 1 --port 20005 --dev br-lan --dev br-iot -f
-> 
-> # 3. Persist on router reboot
-> sed -i '/exit 0/i udp-broadcast-relay-redux --id 1 --port 20005 --dev br-lan --dev br-iot -f &' /etc/rc.local
-> ```
+> [!TIP]
+> For a deep dive into the network packets, state transitions, debouncing engine, and process flow, see [**ARCHITECTURE.md**](file:///Users/pratik/Developer/debian-D235-Doorbell-Press-MQTT/ARCHITECTURE.md).
 
 ---
 
-## Quick Setup with Docker Compose (Recommended)
-
-Running with Docker Compose is the easiest and cleanest way to run and manage the service on Debian/Linux.
+## Quick Start (Docker Compose)
 
 ### 1. Clone the Repository
 
@@ -47,28 +27,25 @@ cd tapo-door-bell
 Copy the example environment file:
 ```bash
 cp .env.example .env
-```
-
-Edit `.env` to set your MQTT password and settings:
-```bash
 nano .env
 ```
 
+Set your MQTT broker and password:
 ```ini
-# MQTT Broker Details
+# MQTT Broker Settings
 MQTT_BROKER=10.0.0.228
 MQTT_PORT=1883
 MQTT_TOPIC=doorbell/press
 MQTT_USER=homeassistant
 MQTT_PASS=your_mqtt_password_here
 
-# Doorbell Settings
-# Tapo D235 IP address. Leave blank or set to 'auto' to accept UDP packets from any IP on port 20005
-DOORBELL_IP=10.0.10.112
+# Doorbell Settings (auto accepts packets from any device/relay on port 20005)
+DOORBELL_IP=auto
 UDP_PORT=20005
 PULSE_TIME=2.0
+COOLDOWN_TIME=5.0
 
-# Home Assistant Auto-Discovery (true/false)
+# Home Assistant Auto-Discovery
 HA_DISCOVERY=true
 HA_DISCOVERY_PREFIX=homeassistant
 ```
@@ -80,78 +57,107 @@ docker compose up -d --build
 ```
 
 > [!NOTE]
-> The `docker-compose.yml` uses `network_mode: host` so the container can directly bind to port `20005` and receive physical LAN UDP broadcast packets from the doorbell without Docker NAT restrictions.
+> The container uses `network_mode: host` to bind directly to the host's network interfaces, allowing it to receive local UDP broadcast packets without Docker NAT restrictions.
 
-### 4. Manage Container
+### 4. View Live Logs
 
-- **View Live Logs:**
-  ```bash
-  docker compose logs -f
-  ```
-- **Restart Container:**
-  ```bash
-  docker compose restart
-  ```
-- **Stop Container:**
-  ```bash
-  docker compose down
-  ```
-- **Update Container:**
-  ```bash
-  git pull
-  docker compose up -d --build
-  ```
+```bash
+docker compose logs -f
+```
+
+You should see:
+```text
+[MQTT] Connecting to broker 10.0.0.228:1883 (user: homeassistant)...
+[MQTT] Connected with result code 0
+[MQTT] Published Home Assistant discovery config to homeassistant/binary_sensor/tapo_doorbell/press/config
+[MQTT] Published initial 'off' to doorbell/press
+[UDP] Listening for broadcast packets on port 20005 (Filtering for IP: ANY (auto-detect))...
+```
 
 ---
 
-## Alternative: Native Linux Service (systemd)
+## Container Management
 
-If you prefer to run it natively without Docker:
+| Action | Command |
+| :--- | :--- |
+| **View logs** | `docker compose logs -f` |
+| **Restart** | `docker compose restart` |
+| **Stop** | `docker compose down` |
+| **Update** | `git pull && docker compose up -d --build` |
 
-```bash
-sudo bash install.sh
-sudo nano /etc/mqttsniffer/mqttsniffer.env
-sudo systemctl restart mqtt-sniffer
-sudo journalctl -u mqtt-sniffer -f
-```
+---
+
+## IoT VLAN Setup (Cross-Subnet Relay)
+
+If your Tapo Doorbell is on an **IoT network/VLAN** (e.g. `10.0.10.x`) and your Docker host is on your **main LAN** (e.g. `10.0.0.x`), standard routers will drop the UDP broadcast packets.
+
+### GL.iNet / OpenWrt Setup
+
+On your GL.iNet router terminal (`ssh root@10.0.0.1`):
+
+1. **Install the relay package:**
+   ```bash
+   opkg update && opkg install udp-broadcast-relay-redux
+   ```
+
+2. **Start the relay in the background:**
+   ```bash
+   udp-broadcast-relay-redux --id 1 --port 20005 --dev br-lan --dev br-iot -f
+   ```
+
+3. **Make it persistent across router reboots:**
+   ```bash
+   sed -i '/exit 0/i udp-broadcast-relay-redux --id 1 --port 20005 --dev br-lan --dev br-iot -f &' /etc/rc.local
+   ```
 
 ---
 
 ## Home Assistant Integration
 
-### Option 1: Automatic Discovery (Default)
+With `HA_DISCOVERY=true`, Home Assistant automatically detects the doorbell:
 
-With `HA_DISCOVERY=true` enabled, the sniffer automatically publishes discovery metadata to `homeassistant/binary_sensor/tapo_d235_doorbell/config`.
-
-Home Assistant will automatically discover:
-- **Entity**: `binary_sensor.tapo_doorbell_press`
-- **Device Class**: `doorbell`
-
-### Option 2: Manual YAML Configuration
-
-If you do not use MQTT discovery, you can add this to your Home Assistant `configuration.yaml`:
-
-```yaml
-mqtt:
-  binary_sensor:
-    - name: "Tapo Doorbell Press"
-      state_topic: "doorbell/press"
-      payload_on: "on"
-      payload_off: "off"
-      device_class: doorbell
-```
+1. Go to **Settings** → **Devices & Services** → **MQTT** → **Devices**.
+2. Look for **Tapo Doorbell**.
+3. **Entity:** `binary_sensor.tapo_doorbell_press`
+   * State: `off` (Clear)
+   * State when pressed: `on` (Detected) for 2.0 seconds.
 
 ---
 
-## Troubleshooting & Verification
+## Scrypted (Apple HomeKit) Integration
 
-1. **Verify MQTT connectivity from the host:**
-   ```bash
-   mosquitto_sub -h 10.0.0.228 -p 1883 -u homeassistant -P "<YOUR_PASSWORD>" -t "doorbell/#" -v
+To trigger Apple TV doorbell video popups, HomePod chimes, and iPhone notifications:
+
+1. In Scrypted, install the **MQTT** plugin and click **Add Device** (select `button.ts`).
+2. Under **General Settings**:
+   * **Subscription URL:** `mqtt://10.0.0.228:1883/doorbell`
+   * **Username:** `homeassistant`
+   * **Password:** *(your MQTT password)*
+3. Under the **EDIT** tab, verify the script:
+   ```typescript
+   mqtt.subscribe({
+       'press': value => {
+           device.binaryState = value.text === "on";
+       }
+   });
+   mqtt.handleTypes(ScryptedInterface.BinarySensor);
    ```
-2. **Verify UDP broadcast packets are reaching your host:**
-   Press the doorbell button and check if packets arrive on port 20005:
-   ```bash
-   sudo tcpdump -n -i any udp port 20005
-   ```
-   If no packets appear when pressing the button, your router is blocking UDP broadcasts across subnets/VLANs (see the [Subnet / VLAN Note](#architecture--how-it-works)).
+4. In Scrypted, go to your **Doorbell Camera** (Tapo D130) → **Extensions** (or **Doorbell**) → set **Linked Doorbell Button** to this device.
+
+---
+
+## Configuration Reference
+
+| Environment Variable | Default | Description |
+| :--- | :--- | :--- |
+| `MQTT_BROKER` | `10.0.0.228` | MQTT broker IP or hostname |
+| `MQTT_PORT` | `1883` | MQTT broker port |
+| `MQTT_TOPIC` | `doorbell/press` | Topic where press state is published |
+| `MQTT_USER` | `homeassistant` | MQTT username |
+| `MQTT_PASS` | `""` | MQTT password |
+| `DOORBELL_IP` | `auto` | Target IP, comma-separated list, or `auto` for any sender |
+| `UDP_PORT` | `20005` | Port the Tapo doorbell broadcasts to |
+| `PULSE_TIME` | `2.0` | Seconds to hold `"on"` before returning to `"off"` |
+| `COOLDOWN_TIME` | `5.0` | Seconds to ignore duplicate burst packets from a single press |
+| `HA_DISCOVERY` | `true` | Publish Home Assistant MQTT auto-discovery metadata |
+| `HA_DISCOVERY_PREFIX` | `homeassistant` | Home Assistant MQTT discovery prefix |
