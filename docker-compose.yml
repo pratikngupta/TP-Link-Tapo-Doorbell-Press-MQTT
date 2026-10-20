@@ -1,0 +1,18 @@
+services:
+  tapo-doorbell-mqtt:
+    build: .
+    container_name: tapo-doorbell-mqtt
+    restart: unless-stopped
+    # CRITICAL: host network mode is required to receive LAN UDP broadcasts (port 20005)
+    network_mode: host
+    environment:
+      - MQTT_BROKER=${MQTT_BROKER:-10.0.0.228}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - MQTT_TOPIC=${MQTT_TOPIC:-doorbell/press}
+      - MQTT_USER=${MQTT_USER:-homeassistant}
+      - MQTT_PASS=${MQTT_PASS:-}
+      - DOORBELL_IP=${DOORBELL_IP:-10.0.10.112}
+      - UDP_PORT=${UDP_PORT:-20005}
+      - PULSE_TIME=${PULSE_TIME:-2.0}
+      - HA_DISCOVERY=${HA_DISCOVERY:-true}
+      - HA_DISCOVERY_PREFIX=${HA_DISCOVERY_PREFIX:-homeassistant}

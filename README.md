@@ -21,35 +21,28 @@ Captures UDP broadcast events on port `20005` emitted when the **TP-Link Tapo D2
 
 ---
 
-## Quick Setup on Debian / Ubuntu
+## Quick Setup with Docker Compose (Recommended)
 
-### Automated Installation
+Running with Docker Compose is the easiest and cleanest way to run and manage the service on Debian/Linux.
 
-Clone or copy this repository to your Debian server, then run:
-
-```bash
-sudo bash install.sh
-```
-
-The installer will:
-- Install Python 3, venv, and Mosquitto utilities
-- Set up a virtual environment in `/opt/mqtt_sniffer_env`
-- Install dependencies (`paho-mqtt`)
-- Copy `mqttsniffer.py` to `/etc/mqttsniffer/mqttsniffer.py`
-- Create `/etc/mqttsniffer/mqttsniffer.env`
-- Install and start the `mqtt-sniffer.service` systemd service
-
----
-
-### Configuration
-
-Edit `/etc/mqttsniffer/mqttsniffer.env`:
+### 1. Clone the Repository
 
 ```bash
-sudo nano /etc/mqttsniffer/mqttsniffer.env
+git clone https://github.com/pratikngupta/tapo-door-bell.git
+cd tapo-door-bell
 ```
 
-Set your configuration:
+### 2. Configure Environment
+
+Copy the example environment file:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` to set your MQTT password and settings:
+```bash
+nano .env
+```
 
 ```ini
 # MQTT Broker Details
@@ -57,7 +50,7 @@ MQTT_BROKER=10.0.0.228
 MQTT_PORT=1883
 MQTT_TOPIC=doorbell/press
 MQTT_USER=homeassistant
-MQTT_PASS=your_secret_password_here
+MQTT_PASS=your_mqtt_password_here
 
 # Doorbell Settings
 # Tapo D235 IP address. Leave blank or set to 'auto' to accept UDP packets from any IP on port 20005
@@ -70,32 +63,47 @@ HA_DISCOVERY=true
 HA_DISCOVERY_PREFIX=homeassistant
 ```
 
-Restart the service after making changes:
+### 3. Start the Container
 
 ```bash
-sudo systemctl restart mqtt-sniffer
+docker compose up -d --build
 ```
 
----
+> [!NOTE]
+> The `docker-compose.yml` uses `network_mode: host` so the container can directly bind to port `20005` and receive physical LAN UDP broadcast packets from the doorbell without Docker NAT restrictions.
 
-## Service Management
+### 4. Manage Container
 
 - **View Live Logs:**
   ```bash
-  sudo journalctl -u mqtt-sniffer -f
+  docker compose logs -f
   ```
-- **Check Service Status:**
+- **Restart Container:**
   ```bash
-  sudo systemctl status mqtt-sniffer
+  docker compose restart
   ```
-- **Stop Service:**
+- **Stop Container:**
   ```bash
-  sudo systemctl stop mqtt-sniffer
+  docker compose down
   ```
-- **Start Service:**
+- **Update Container:**
   ```bash
-  sudo systemctl start mqtt-sniffer
+  git pull
+  docker compose up -d --build
   ```
+
+---
+
+## Alternative: Native Linux Service (systemd)
+
+If you prefer to run it natively without Docker:
+
+```bash
+sudo bash install.sh
+sudo nano /etc/mqttsniffer/mqttsniffer.env
+sudo systemctl restart mqtt-sniffer
+sudo journalctl -u mqtt-sniffer -f
+```
 
 ---
 
@@ -127,11 +135,11 @@ mqtt:
 
 ## Troubleshooting & Verification
 
-1. **Verify MQTT connectivity from the Debian server:**
+1. **Verify MQTT connectivity from the host:**
    ```bash
    mosquitto_sub -h 10.0.0.228 -p 1883 -u homeassistant -P "<YOUR_PASSWORD>" -t "doorbell/#" -v
    ```
-2. **Verify UDP broadcast packets are reaching your server:**
+2. **Verify UDP broadcast packets are reaching your host:**
    Press the doorbell button and check if packets arrive on port 20005:
    ```bash
    sudo tcpdump -n -i any udp port 20005
