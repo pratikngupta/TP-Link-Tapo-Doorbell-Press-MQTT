@@ -9,7 +9,8 @@ import paho.mqtt.client as mqtt
 MQTT_BROKER = os.getenv("MQTT_BROKER", "10.0.0.1")
 MQTT_PORT   = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC  = os.getenv("MQTT_TOPIC", "doorbell/press")
-MQTT_USER   = os.getenv("MQTT_USER", "homeassistant")
+MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID", "tapo-door-bell")
+MQTT_USER   = os.getenv("MQTT_USER", "tapo-door-bell")
 MQTT_PASS   = os.getenv("MQTT_PASS", "")
 AVAILABILITY_TOPIC = os.getenv("AVAILABILITY_TOPIC", "doorbell/status")
 
@@ -96,6 +97,7 @@ def banner() -> None:
         _print(f"  {label}: {padded_value}", color)
 
     _line("Broker", f"{MQTT_BROKER}:{MQTT_PORT}")
+    _line("Client ID", MQTT_CLIENT_ID)
     _line("User", f"{MQTT_USER or 'anonymous'}")
     _line("Event topic", MQTT_TOPIC)
     _line("UDP port", str(UDP_PORT))
@@ -111,9 +113,9 @@ def banner() -> None:
 
 # --- MQTT setup ---
 if hasattr(mqtt, "CallbackAPIVersion"):
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=MQTT_CLIENT_ID)
 else:
-    client = mqtt.Client()
+    client = mqtt.Client(client_id=MQTT_CLIENT_ID)
 
 client.on_connect = on_connect
 client.on_disconnect = on_disconnect
@@ -124,7 +126,7 @@ if MQTT_USER:
 client.will_set(AVAILABILITY_TOPIC, payload="offline", qos=1, retain=True)
 
 banner()
-print(f"[MQTT] Connecting to broker {MQTT_BROKER}:{MQTT_PORT} (user: {MQTT_USER or 'anonymous'})...")
+print(f"[MQTT] Connecting to broker {MQTT_BROKER}:{MQTT_PORT} as '{MQTT_CLIENT_ID}' (user: {MQTT_USER or 'anonymous'})...")
 client.connect_async(MQTT_BROKER, MQTT_PORT)
 client.loop_start()
 

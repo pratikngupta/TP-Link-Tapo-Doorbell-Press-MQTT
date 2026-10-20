@@ -9,7 +9,8 @@ services:
       - MQTT_BROKER=${MQTT_BROKER:-10.0.0.1}
       - MQTT_PORT=${MQTT_PORT:-1883}
       - MQTT_TOPIC=${MQTT_TOPIC:-doorbell/press}
-      - MQTT_USER=${MQTT_USER:-homeassistant}
+      - MQTT_CLIENT_ID=${MQTT_CLIENT_ID:-tapo-door-bell}
+      - MQTT_USER=${MQTT_USER:-tapo-door-bell}
       - MQTT_PASS=${MQTT_PASS:-}
       - DOORBELL_IP=${DOORBELL_IP:-auto}
       - UDP_PORT=${UDP_PORT:-20005}

@@ -40,7 +40,8 @@ Set your MQTT broker and password:
 MQTT_BROKER=10.0.0.1
 MQTT_PORT=1883
 MQTT_TOPIC=doorbell/press
-MQTT_USER=homeassistant
+MQTT_CLIENT_ID=tapo-door-bell
+MQTT_USER=tapo-door-bell
 MQTT_PASS=your_mqtt_password_here
 
 # Doorbell Settings (auto accepts packets from any device/relay on port 20005)
@@ -72,7 +73,7 @@ docker compose logs -f
 You should see:
 
 ```text
-[MQTT] Connecting to broker YOUR_BROKER_IP:1883 (user: homeassistant)...
+[MQTT] Connecting to broker YOUR_BROKER_IP:1883 as 'tapo-door-bell' (user: tapo-door-bell)...
 [MQTT] Connected with result code 0
 [MQTT] Published Home Assistant discovery config to homeassistant/binary_sensor/tapo_doorbell/press/config
 [MQTT] Published initial 'off' to doorbell/press
@@ -141,7 +142,8 @@ To trigger Apple TV doorbell video popups, HomePod chimes, and iPhone notificati
 | `MQTT_BROKER` | `10.0.0.1` | MQTT broker IP or hostname |
 | `MQTT_PORT` | `1883` | MQTT broker port |
 | `MQTT_TOPIC` | `doorbell/press` | Topic where press state is published |
-| `MQTT_USER` | `homeassistant` | MQTT username |
+| `MQTT_CLIENT_ID` | `tapo-door-bell` | Client ID sent to MQTT broker |
+| `MQTT_USER` | `tapo-door-bell` | MQTT username |
 | `MQTT_PASS` | `""` | MQTT password |
 | `DOORBELL_IP` | `auto` | Target IP, comma-separated list, or `auto` for any sender |
 | `UDP_PORT` | `20005` | Port the Tapo doorbell broadcasts to |
