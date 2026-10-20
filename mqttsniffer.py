@@ -7,7 +7,7 @@ import time
 import paho.mqtt.client as mqtt
 
 # --- Configuration (defaults or from environment variables) ---
-MQTT_BROKER = os.getenv("MQTT_BROKER", "10.0.0.228")
+MQTT_BROKER = os.getenv("MQTT_BROKER", "10.0.0.1")
 MQTT_PORT   = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC  = os.getenv("MQTT_TOPIC", "doorbell/press")
 MQTT_USER   = os.getenv("MQTT_USER", "homeassistant")

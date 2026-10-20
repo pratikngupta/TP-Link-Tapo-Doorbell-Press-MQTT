@@ -23,7 +23,7 @@ sequenceDiagram
     participant Doorbell as Tapo D130 Doorbell<br/>(IoT VLAN 10.0.10.112)
     participant Router as GL.iNet Router<br/>(udp-broadcast-relay)
     participant Sniffer as Docker Container<br/>(mqttsniffer.py / host net)
-    participant Broker as Mosquitto MQTT<br/>(10.0.0.228:1883)
+    participant Broker as Mosquitto MQTT<br/>(10.0.0.1:1883)
     participant HA as Home Assistant<br/>(binary_sensor)
     participant Scrypted as Scrypted / HomeKit<br/>(Doorbell Chime & Popup)
 
@@ -58,7 +58,7 @@ sequenceDiagram
 
 ### Phase 1: Configuration & Environment Loading
 The script loads its settings from environment variables passed via Docker Compose:
-* `MQTT_BROKER`: Broker IP/hostname (default: `10.0.0.228`).
+* `MQTT_BROKER`: Broker IP/hostname (default: `10.0.0.1`).
 * `MQTT_PORT`: Broker port (default: `1883`).
 * `MQTT_TOPIC`: Event topic (default: `doorbell/press`).
 * `AVAILABILITY_TOPIC`: Service status topic (default: `doorbell/status`).

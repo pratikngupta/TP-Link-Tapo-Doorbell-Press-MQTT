@@ -9,7 +9,7 @@ Zero-latency local MQTT event bridge for **TP-Link Tapo Video Doorbells** (Tapo 
 Captures the local UDP broadcast on port `20005` transmitted when the physical button is pressed and publishes instantaneous MQTT events for **Home Assistant** automations and **Scrypted / Apple HomeKit** doorbell chimes and camera popups.
 
 > [!TIP]
-> For a deep dive into the network packets, state transitions, debouncing engine, and process flow, see [**ARCHITECTURE.md**](file:///Users/pratik/Developer/debian-D235-Doorbell-Press-MQTT/ARCHITECTURE.md).
+> For a deep dive into the packets, debouncing, and process flow, see [**ARCHITECTURE.md**](./ARCHITECTURE.md).
 
 ---
 
@@ -25,15 +25,17 @@ cd tapo-door-bell
 ### 2. Configure Environment
 
 Copy the example environment file:
+
 ```bash
 cp .env.example .env
 nano .env
 ```
 
 Set your MQTT broker and password:
+
 ```ini
 # MQTT Broker Settings
-MQTT_BROKER=10.0.0.228
+MQTT_BROKER=10.0.0.1
 MQTT_PORT=1883
 MQTT_TOPIC=doorbell/press
 MQTT_USER=homeassistant
@@ -66,8 +68,9 @@ docker compose logs -f
 ```
 
 You should see:
+
 ```text
-[MQTT] Connecting to broker 10.0.0.228:1883 (user: homeassistant)...
+[MQTT] Connecting to broker YOUR_BROKER_IP:1883 (user: homeassistant)...
 [MQTT] Connected with result code 0
 [MQTT] Published Home Assistant discovery config to homeassistant/binary_sensor/tapo_doorbell/press/config
 [MQTT] Published initial 'off' to doorbell/press
@@ -87,28 +90,9 @@ You should see:
 
 ---
 
-## IoT VLAN Setup (Cross-Subnet Relay)
+## Cross-Subnet / VLAN Setup
 
-If your Tapo Doorbell is on an **IoT network/VLAN** (e.g. `10.0.10.x`) and your Docker host is on your **main LAN** (e.g. `10.0.0.x`), standard routers will drop the UDP broadcast packets.
-
-### GL.iNet / OpenWrt Setup
-
-On your GL.iNet router terminal (`ssh root@10.0.0.1`):
-
-1. **Install the relay package:**
-   ```bash
-   opkg update && opkg install udp-broadcast-relay-redux
-   ```
-
-2. **Start the relay in the background:**
-   ```bash
-   udp-broadcast-relay-redux --id 1 --port 20005 --dev br-lan --dev br-iot -f
-   ```
-
-3. **Make it persistent across router reboots:**
-   ```bash
-   sed -i '/exit 0/i udp-broadcast-relay-redux --id 1 --port 20005 --dev br-lan --dev br-iot -f &' /etc/rc.local
-   ```
+If your doorbell is on a **separate IoT network** and your Docker host is on your **main LAN**, the router needs to relay UDP broadcasts between subnets. See [ARCHITECTURE.md](./ARCHITECTURE.md) for router-specific instructions.
 
 ---
 
@@ -130,10 +114,11 @@ To trigger Apple TV doorbell video popups, HomePod chimes, and iPhone notificati
 
 1. In Scrypted, install the **MQTT** plugin and click **Add Device** (select `button.ts`).
 2. Under **General Settings**:
-   * **Subscription URL:** `mqtt://10.0.0.228:1883/doorbell`
+   * **Subscription URL:** `mqtt://YOUR_BROKER_IP:1883/doorbell`
    * **Username:** `homeassistant`
    * **Password:** *(your MQTT password)*
 3. Under the **EDIT** tab, verify the script:
+
    ```typescript
    mqtt.subscribe({
        'press': value => {
@@ -142,6 +127,7 @@ To trigger Apple TV doorbell video popups, HomePod chimes, and iPhone notificati
    });
    mqtt.handleTypes(ScryptedInterface.BinarySensor);
    ```
+
 4. In Scrypted, go to your **Doorbell Camera** (Tapo D130) → **Extensions** (or **Doorbell**) → set **Linked Doorbell Button** to this device.
 
 ---
@@ -150,7 +136,7 @@ To trigger Apple TV doorbell video popups, HomePod chimes, and iPhone notificati
 
 | Environment Variable | Default | Description |
 | :--- | :--- | :--- |
-| `MQTT_BROKER` | `10.0.0.228` | MQTT broker IP or hostname |
+| `MQTT_BROKER` | `10.0.0.1` | MQTT broker IP or hostname |
 | `MQTT_PORT` | `1883` | MQTT broker port |
 | `MQTT_TOPIC` | `doorbell/press` | Topic where press state is published |
 | `MQTT_USER` | `homeassistant` | MQTT username |
