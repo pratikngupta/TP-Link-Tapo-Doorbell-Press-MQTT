@@ -12,6 +12,8 @@ MQTT_PORT   = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC  = os.getenv("MQTT_TOPIC", "doorbell/press")
 MQTT_USER   = os.getenv("MQTT_USER", "homeassistant")
 MQTT_PASS   = os.getenv("MQTT_PASS", "")  # Set via environment or mqttsniffer.env
+AVAILABILITY_TOPIC = os.getenv("AVAILABILITY_TOPIC", "doorbell/status")
+
 # Parse DOORBELL_IP: can be 'auto', 'any', empty, a single IP, or comma-separated list
 raw_doorbell_ip = os.getenv("DOORBELL_IP", "auto").strip()
 if raw_doorbell_ip.lower() in ("auto", "any", ""):
@@ -32,19 +34,22 @@ def publish_ha_discovery(client):
 
     discovery_topic = f"{HA_DISCOVERY_PREFIX}/binary_sensor/tapo_doorbell/press/config"
     discovery_payload = {
-        "name": "Doorbell Press",
-        "unique_id": "tapo_d130_doorbell_press",
+        "name": "Tapo Doorbell Press",
+        "unique_id": "tapo_doorbell_press",
         "object_id": "tapo_doorbell_press",
         "state_topic": MQTT_TOPIC,
         "payload_on": "on",
         "payload_off": "off",
-        "device_class": "doorbell",
-        "has_entity_name": True,
+        "icon": "mdi:bell",
+        "availability_topic": AVAILABILITY_TOPIC,
+        "payload_available": "online",
+        "payload_not_available": "offline",
         "device": {
-            "identifiers": ["tapo_doorbell_press_device"],
+            "identifiers": ["tapo_doorbell_device"],
             "name": "Tapo Doorbell",
             "model": "D130",
-            "manufacturer": "TP-Link Tapo"
+            "manufacturer": "TP-Link Tapo",
+            "sw_version": "1.0.0"
         }
     }
     try:
@@ -57,12 +62,14 @@ def publish_ha_discovery(client):
 # --- MQTT callbacks (support both paho-mqtt v1 and v2) ---
 def on_connect_v1(client, userdata, flags, rc):
     print(f"[MQTT] Connected with result code {rc}")
+    client.publish(AVAILABILITY_TOPIC, payload="online", qos=1, retain=True)
     publish_ha_discovery(client)
     client.publish(MQTT_TOPIC, payload="off", qos=0, retain=True)
     print(f"[MQTT] Published initial 'off' to {MQTT_TOPIC}")
 
 def on_connect_v2(client, userdata, flags, rc, properties=None):
     print(f"[MQTT] Connected with result code {rc}")
+    client.publish(AVAILABILITY_TOPIC, payload="online", qos=1, retain=True)
     publish_ha_discovery(client)
     client.publish(MQTT_TOPIC, payload="off", qos=0, retain=True)
     print(f"[MQTT] Published initial 'off' to {MQTT_TOPIC}")
@@ -97,6 +104,9 @@ else:
 if MQTT_USER:
     client.username_pw_set(MQTT_USER, MQTT_PASS if MQTT_PASS else None)
 
+# Set Last Will and Testament so Home Assistant marks entity offline if service terminates
+client.will_set(AVAILABILITY_TOPIC, payload="offline", qos=1, retain=True)
+
 print(f"[MQTT] Connecting to broker {MQTT_BROKER}:{MQTT_PORT} (user: {MQTT_USER or 'anonymous'})...")
 client.connect_async(MQTT_BROKER, MQTT_PORT)
 client.loop_start()
@@ -124,15 +134,19 @@ try:
 
         if is_match:
             print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – Doorbell pressed!")
-            client.publish(MQTT_TOPIC, payload="on", qos=0, retain=False)
+            client.publish(MQTT_TOPIC, payload="on", qos=1, retain=False)
             time.sleep(PULSE_TIME)
-            client.publish(MQTT_TOPIC, payload="off", qos=0, retain=True)
+            client.publish(MQTT_TOPIC, payload="off", qos=1, retain=True)
         else:
             print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – IGNORED (IP {sender_ip} not in {allowed_ips}). Tip: Set DOORBELL_IP=auto in .env to accept.")
 
 except KeyboardInterrupt:
     print("\n[Sniffer] Exiting cleanly...")
 finally:
+    try:
+        client.publish(AVAILABILITY_TOPIC, payload="offline", qos=1, retain=True)
+    except Exception:
+        pass
     client.loop_stop()
     client.disconnect()
     sock.close()
