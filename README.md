@@ -14,10 +14,20 @@ Captures UDP broadcast events on port `20005` emitted when the **TP-Link Tapo D2
 3. Automatically publishes Home Assistant MQTT Discovery configuration, so Home Assistant creates a native `binary_sensor` with `device_class: doorbell` automatically.
 
 > [!IMPORTANT]
-> **Subnet / VLAN Note:**
-> UDP broadcast packets do not traverse standard routers/subnets by default. If your doorbell is on an IoT VLAN (e.g. `10.0.10.112`) and your Debian server is on `10.0.0.x`, you must either:
-> 1. Attach a virtual interface/VLAN on your Debian server to the IoT subnet (`10.0.10.0/24`), OR
-> 2. Enable a UDP broadcast relay on your router (e.g., `udp-broadcast-relay` on UniFi, pfSense, OPNsense, or OpenWrt forwarding UDP port `20005` between VLANs).
+> **Subnet / VLAN Note (e.g. IoT on `10.0.10.x` & Server on `10.0.0.x`):**
+> UDP broadcast packets do not traverse standard routers/subnets by default. If your doorbell is on an IoT VLAN and your Debian server is on your main LAN, enable a UDP broadcast relay on your router.
+>
+> **Example for GL.iNet / OpenWrt routers:**
+> ```bash
+> # 1. Install relay package
+> opkg update && opkg install udp-broadcast-relay-redux
+> 
+> # 2. Run in background (relaying between br-lan and br-iot)
+> udp-broadcast-relay-redux --id 1 --port 20005 --dev br-lan --dev br-iot -f
+> 
+> # 3. Persist on router reboot
+> sed -i '/exit 0/i udp-broadcast-relay-redux --id 1 --port 20005 --dev br-lan --dev br-iot -f &' /etc/rc.local
+> ```
 
 ---
 
