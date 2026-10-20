@@ -30,18 +30,20 @@ def publish_ha_discovery(client):
     if not HA_DISCOVERY:
         return
 
-    discovery_topic = f"{HA_DISCOVERY_PREFIX}/binary_sensor/tapo_d235_doorbell/config"
+    discovery_topic = f"{HA_DISCOVERY_PREFIX}/binary_sensor/tapo_doorbell/press/config"
     discovery_payload = {
-        "name": "Tapo Doorbell Press",
-        "unique_id": "tapo_d235_doorbell_press",
+        "name": "Doorbell Press",
+        "unique_id": "tapo_d130_doorbell_press",
+        "object_id": "tapo_doorbell_press",
         "state_topic": MQTT_TOPIC,
         "payload_on": "on",
         "payload_off": "off",
         "device_class": "doorbell",
+        "has_entity_name": True,
         "device": {
-            "identifiers": ["tapo_d235_doorbell"],
-            "name": "Tapo D235 Doorbell",
-            "model": "D235",
+            "identifiers": ["tapo_doorbell_press_device"],
+            "name": "Tapo Doorbell",
+            "model": "D130",
             "manufacturer": "TP-Link Tapo"
         }
     }
@@ -56,13 +58,13 @@ def publish_ha_discovery(client):
 def on_connect_v1(client, userdata, flags, rc):
     print(f"[MQTT] Connected with result code {rc}")
     publish_ha_discovery(client)
-    client.publish(MQTT_TOPIC, payload="off", qos=0, retain=False)
+    client.publish(MQTT_TOPIC, payload="off", qos=0, retain=True)
     print(f"[MQTT] Published initial 'off' to {MQTT_TOPIC}")
 
 def on_connect_v2(client, userdata, flags, rc, properties=None):
     print(f"[MQTT] Connected with result code {rc}")
     publish_ha_discovery(client)
-    client.publish(MQTT_TOPIC, payload="off", qos=0, retain=False)
+    client.publish(MQTT_TOPIC, payload="off", qos=0, retain=True)
     print(f"[MQTT] Published initial 'off' to {MQTT_TOPIC}")
 
 def on_disconnect_v1(client, userdata, rc):
@@ -124,7 +126,7 @@ try:
             print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – Doorbell pressed!")
             client.publish(MQTT_TOPIC, payload="on", qos=0, retain=False)
             time.sleep(PULSE_TIME)
-            client.publish(MQTT_TOPIC, payload="off", qos=0, retain=False)
+            client.publish(MQTT_TOPIC, payload="off", qos=0, retain=True)
         else:
             print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – IGNORED (IP {sender_ip} not in {allowed_ips}). Tip: Set DOORBELL_IP=auto in .env to accept.")
 
