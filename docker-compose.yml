@@ -14,5 +14,6 @@ services:
       - DOORBELL_IP=${DOORBELL_IP:-auto}
       - UDP_PORT=${UDP_PORT:-20005}
       - PULSE_TIME=${PULSE_TIME:-2.0}
+      - COOLDOWN_TIME=${COOLDOWN_TIME:-5.0}
       - HA_DISCOVERY=${HA_DISCOVERY:-true}
       - HA_DISCOVERY_PREFIX=${HA_DISCOVERY_PREFIX:-homeassistant}

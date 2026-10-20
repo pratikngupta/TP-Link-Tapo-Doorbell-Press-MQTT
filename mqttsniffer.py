@@ -21,9 +21,10 @@ if raw_doorbell_ip.lower() in ("auto", "any", ""):
 else:
     allowed_ips = [ip.strip() for ip in raw_doorbell_ip.split(",") if ip.strip()]
 
-UDP_PORT    = int(os.getenv("UDP_PORT", "20005"))
-PULSE_TIME  = float(os.getenv("PULSE_TIME", "2.0"))  # Seconds for "on" pulse
-HA_DISCOVERY = os.getenv("HA_DISCOVERY", "true").lower() in ("true", "1", "yes")
+UDP_PORT      = int(os.getenv("UDP_PORT", "20005"))
+PULSE_TIME    = float(os.getenv("PULSE_TIME", "2.0"))      # Seconds for "on" pulse
+COOLDOWN_TIME = float(os.getenv("COOLDOWN_TIME", "5.0"))  # Seconds to ignore repeated burst packets
+HA_DISCOVERY  = os.getenv("HA_DISCOVERY", "true").lower() in ("true", "1", "yes")
 HA_DISCOVERY_PREFIX = os.getenv("HA_DISCOVERY_PREFIX", "homeassistant")
 
 
@@ -125,6 +126,8 @@ sock.bind(("", UDP_PORT))
 target_info = ", ".join(allowed_ips) if allowed_ips else "ANY (auto-detect)"
 print(f"[UDP] Listening for broadcast packets on port {UDP_PORT} (Filtering for IP: {target_info})...")
 
+last_press_time = 0.0
+
 try:
     while True:
         data, addr = sock.recvfrom(1024)
@@ -133,10 +136,26 @@ try:
         is_match = not allowed_ips or sender_ip in allowed_ips
 
         if is_match:
+            now = time.time()
+            if now - last_press_time < COOLDOWN_TIME:
+                # Doorbell sends bursts of multiple UDP packets per press; ignore duplicates in cooldown
+                continue
+
+            last_press_time = now
             print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – Doorbell pressed!")
             client.publish(MQTT_TOPIC, payload="on", qos=1, retain=False)
             time.sleep(PULSE_TIME)
             client.publish(MQTT_TOPIC, payload="off", qos=1, retain=True)
+
+            # Drain any remaining burst packets that queued up in socket buffer during sleep
+            sock.setblocking(False)
+            try:
+                while True:
+                    sock.recvfrom(1024)
+            except (BlockingIOError, socket.error):
+                pass
+            finally:
+                sock.setblocking(True)
         else:
             print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – IGNORED (IP {sender_ip} not in {allowed_ips}). Tip: Set DOORBELL_IP=auto in .env to accept.")
 
