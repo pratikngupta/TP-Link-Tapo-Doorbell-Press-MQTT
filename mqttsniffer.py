@@ -88,7 +88,7 @@ def banner() -> None:
     _print("║  Tapo Doorbell MQTT Sniffer v1.0.0      ║", "cyan")
     _print("║  Local UDP to MQTT bridge   ║", "cyan")
     _print("╚══════════════════════════════════════════╝", "cyan")
-    _print()
+    print()
 
     width = 46
     def _line(label: str, value: str, color: str = "yellow") -> None:
@@ -106,7 +106,7 @@ def banner() -> None:
     else:
         _line("Filter IPs", "ANY (auto-detect)")
     _line("HA Discovery", "Enabled" if HA_DISCOVERY else "Disabled")
-    _print()
+    print()
 
 
 # --- MQTT setup ---
@@ -141,7 +141,7 @@ sock.bind(("", UDP_PORT))
 target_info = ", ".join(sorted(allowed_ips)) if allowed_ips else "ANY (auto-detect)"
 print(f"[UDP] Listening for broadcast packets on port {UDP_PORT} (Filtering for IP: {target_info})...")
 _print(f"  Status: ✓ Running (PID {os.getpid()})", "green")
-_print()
+print()
 
 last_press_time = 0.0
 
