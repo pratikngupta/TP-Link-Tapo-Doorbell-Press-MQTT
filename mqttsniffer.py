@@ -1,59 +1,133 @@
 #!/usr/bin/env python3
+import json
+import os
 import socket
+import sys
 import time
 import paho.mqtt.client as mqtt
 
-# --- Settings ---
-MQTT_BROKER = "192.168.10.1"
-MQTT_PORT   = 1883
-MQTT_TOPIC  = "doorbell/press"
-MQTT_USER   = "mqtt" #MQTT Username
-MQTT_PASS   = "password" # MQTT Password
-DOORBELL_IP = "192.168.1.**" # Doorbell IP Address
-UDP_PORT    = 20005  # Destination port the doorbell broadcasts to
-PULSE_TIME  = 2      # seconds for "on" pulse
+# --- Configuration (defaults or from environment variables) ---
+MQTT_BROKER = os.getenv("MQTT_BROKER", "10.0.0.228")
+MQTT_PORT   = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_TOPIC  = os.getenv("MQTT_TOPIC", "doorbell/press")
+MQTT_USER   = os.getenv("MQTT_USER", "homeassistant")
+MQTT_PASS   = os.getenv("MQTT_PASS", "")  # Set via environment or mqttsniffer.env
+DOORBELL_IP = os.getenv("DOORBELL_IP", "10.0.10.112").strip()
+UDP_PORT    = int(os.getenv("UDP_PORT", "20005"))
+PULSE_TIME  = float(os.getenv("PULSE_TIME", "2.0"))  # Seconds for "on" pulse
+HA_DISCOVERY = os.getenv("HA_DISCOVERY", "true").lower() in ("true", "1", "yes")
+HA_DISCOVERY_PREFIX = os.getenv("HA_DISCOVERY_PREFIX", "homeassistant")
 
-# --- MQTT callbacks ---
-def on_connect(client, userdata, flags, rc):
+
+def publish_ha_discovery(client):
+    """Publish Home Assistant MQTT discovery message for automatic sensor registration."""
+    if not HA_DISCOVERY:
+        return
+
+    discovery_topic = f"{HA_DISCOVERY_PREFIX}/binary_sensor/tapo_d235_doorbell/config"
+    discovery_payload = {
+        "name": "Tapo Doorbell Press",
+        "unique_id": "tapo_d235_doorbell_press",
+        "state_topic": MQTT_TOPIC,
+        "payload_on": "on",
+        "payload_off": "off",
+        "device_class": "doorbell",
+        "device": {
+            "identifiers": ["tapo_d235_doorbell"],
+            "name": "Tapo D235 Doorbell",
+            "model": "D235",
+            "manufacturer": "TP-Link Tapo"
+        }
+    }
+    try:
+        client.publish(discovery_topic, payload=json.dumps(discovery_payload), qos=1, retain=True)
+        print(f"[MQTT] Published Home Assistant discovery config to {discovery_topic}")
+    except Exception as e:
+        print(f"[MQTT] Failed to publish Home Assistant discovery config: {e}")
+
+
+# --- MQTT callbacks (support both paho-mqtt v1 and v2) ---
+def on_connect_v1(client, userdata, flags, rc):
     print(f"[MQTT] Connected with result code {rc}")
+    publish_ha_discovery(client)
+    client.publish(MQTT_TOPIC, payload="off", qos=0, retain=False)
+    print(f"[MQTT] Published initial 'off' to {MQTT_TOPIC}")
 
-def on_disconnect(client, userdata, rc):
+def on_connect_v2(client, userdata, flags, rc, properties=None):
+    print(f"[MQTT] Connected with result code {rc}")
+    publish_ha_discovery(client)
+    client.publish(MQTT_TOPIC, payload="off", qos=0, retain=False)
+    print(f"[MQTT] Published initial 'off' to {MQTT_TOPIC}")
+
+def on_disconnect_v1(client, userdata, rc):
     print(f"[MQTT] Disconnected (reason={rc}), retrying in 5 s")
     time.sleep(5)
     try:
         client.reconnect()
     except Exception as e:
-        print("[MQTT] Reconnect failed:", e)
+        print(f"[MQTT] Reconnect failed: {e}")
+
+def on_disconnect_v2(client, userdata, rc, properties=None, *args):
+    print(f"[MQTT] Disconnected (reason={rc}), retrying in 5 s")
+    time.sleep(5)
+    try:
+        client.reconnect()
+    except Exception as e:
+        print(f"[MQTT] Reconnect failed: {e}")
+
 
 # --- MQTT setup ---
-client = mqtt.Client()
-client.username_pw_set(MQTT_USER, MQTT_PASS)
-client.on_connect = on_connect
-client.on_disconnect = on_disconnect
+if hasattr(mqtt, "CallbackAPIVersion"):
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.on_connect = on_connect_v2
+    client.on_disconnect = on_disconnect_v2
+else:
+    client = mqtt.Client()
+    client.on_connect = on_connect_v1
+    client.on_disconnect = on_disconnect_v1
+
+if MQTT_USER:
+    client.username_pw_set(MQTT_USER, MQTT_PASS if MQTT_PASS else None)
+
+print(f"[MQTT] Connecting to broker {MQTT_BROKER}:{MQTT_PORT} (user: {MQTT_USER or 'anonymous'})...")
 client.connect_async(MQTT_BROKER, MQTT_PORT)
 client.loop_start()
-
-# Publish initial OFF state
-client.publish(MQTT_TOPIC, payload="off", qos=0, retain=False)
-print(f"[MQTT] Published initial 'off' to {MQTT_TOPIC}")
 
 # --- UDP listener ---
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-sock.bind(("", UDP_PORT))  # Bind to the broadcast destination port
-print(f"[UDP] Listening for broadcast packets on port {UDP_PORT}...")
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+try:
+    if hasattr(socket, "SO_REUSEPORT"):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+except (AttributeError, OSError):
+    pass
+
+sock.bind(("", UDP_PORT))
+target_info = DOORBELL_IP if DOORBELL_IP and DOORBELL_IP.lower() not in ("auto", "any") else "ANY"
+print(f"[UDP] Listening for broadcast packets on port {UDP_PORT} (Filtering for IP: {target_info})...")
 
 try:
     while True:
         data, addr = sock.recvfrom(1024)
-        if addr[0] == DOORBELL_IP:
+        sender_ip = addr[0]
+
+        is_match = False
+        if not DOORBELL_IP or DOORBELL_IP.lower() in ("auto", "any"):
+            is_match = True
+        elif sender_ip == DOORBELL_IP:
+            is_match = True
+        else:
+            print(f"[UDP] Received packet from {addr} (ignored, does not match DOORBELL_IP: {DOORBELL_IP})")
+
+        if is_match:
             print(f"[UDP] Packet from {addr} – Doorbell pressed!")
             client.publish(MQTT_TOPIC, payload="on", qos=0, retain=False)
             time.sleep(PULSE_TIME)
             client.publish(MQTT_TOPIC, payload="off", qos=0, retain=False)
 
 except KeyboardInterrupt:
-    print("Exiting…")
+    print("\n[Sniffer] Exiting cleanly...")
 finally:
     client.loop_stop()
     client.disconnect()

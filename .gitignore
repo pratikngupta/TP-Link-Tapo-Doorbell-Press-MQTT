@@ -1,0 +1,17 @@
+# Environment files with sensitive credentials
+*.env
+.env
+.env.*
+!*.env.example
+
+# Python virtual environments & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+/opt/mqtt_sniffer_env/
+
+# OS specific files
+.DS_Store
+Thumbs.db
