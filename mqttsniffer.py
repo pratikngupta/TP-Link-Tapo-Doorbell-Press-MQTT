@@ -12,7 +12,13 @@ MQTT_PORT   = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC  = os.getenv("MQTT_TOPIC", "doorbell/press")
 MQTT_USER   = os.getenv("MQTT_USER", "homeassistant")
 MQTT_PASS   = os.getenv("MQTT_PASS", "")  # Set via environment or mqttsniffer.env
-DOORBELL_IP = os.getenv("DOORBELL_IP", "10.0.10.112").strip()
+# Parse DOORBELL_IP: can be 'auto', 'any', empty, a single IP, or comma-separated list
+raw_doorbell_ip = os.getenv("DOORBELL_IP", "auto").strip()
+if raw_doorbell_ip.lower() in ("auto", "any", ""):
+    allowed_ips = []
+else:
+    allowed_ips = [ip.strip() for ip in raw_doorbell_ip.split(",") if ip.strip()]
+
 UDP_PORT    = int(os.getenv("UDP_PORT", "20005"))
 PULSE_TIME  = float(os.getenv("PULSE_TIME", "2.0"))  # Seconds for "on" pulse
 HA_DISCOVERY = os.getenv("HA_DISCOVERY", "true").lower() in ("true", "1", "yes")
@@ -104,7 +110,7 @@ except (AttributeError, OSError):
     pass
 
 sock.bind(("", UDP_PORT))
-target_info = DOORBELL_IP if DOORBELL_IP and DOORBELL_IP.lower() not in ("auto", "any") else "ANY"
+target_info = ", ".join(allowed_ips) if allowed_ips else "ANY (auto-detect)"
 print(f"[UDP] Listening for broadcast packets on port {UDP_PORT} (Filtering for IP: {target_info})...")
 
 try:
@@ -112,19 +118,15 @@ try:
         data, addr = sock.recvfrom(1024)
         sender_ip = addr[0]
 
-        is_match = False
-        if not DOORBELL_IP or DOORBELL_IP.lower() in ("auto", "any"):
-            is_match = True
-        elif sender_ip == DOORBELL_IP:
-            is_match = True
-        else:
-            print(f"[UDP] Received packet from {addr} (ignored, does not match DOORBELL_IP: {DOORBELL_IP})")
+        is_match = not allowed_ips or sender_ip in allowed_ips
 
         if is_match:
-            print(f"[UDP] Packet from {addr} – Doorbell pressed!")
+            print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – Doorbell pressed!")
             client.publish(MQTT_TOPIC, payload="on", qos=0, retain=False)
             time.sleep(PULSE_TIME)
             client.publish(MQTT_TOPIC, payload="off", qos=0, retain=False)
+        else:
+            print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – IGNORED (IP {sender_ip} not in {allowed_ips}). Tip: Set DOORBELL_IP=auto in .env to accept.")
 
 except KeyboardInterrupt:
     print("\n[Sniffer] Exiting cleanly...")

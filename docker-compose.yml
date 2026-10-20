@@ -11,7 +11,7 @@ services:
       - MQTT_TOPIC=${MQTT_TOPIC:-doorbell/press}
       - MQTT_USER=${MQTT_USER:-homeassistant}
       - MQTT_PASS=${MQTT_PASS:-}
-      - DOORBELL_IP=${DOORBELL_IP:-10.0.10.112}
+      - DOORBELL_IP=${DOORBELL_IP:-auto}
       - UDP_PORT=${UDP_PORT:-20005}
       - PULSE_TIME=${PULSE_TIME:-2.0}
       - HA_DISCOVERY=${HA_DISCOVERY:-true}
