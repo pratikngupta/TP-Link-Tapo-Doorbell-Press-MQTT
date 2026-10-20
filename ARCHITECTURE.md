@@ -10,7 +10,7 @@ TP-Link Tapo smart doorbells (such as the **Tapo D130** wired doorbell and **Tap
 
 However, whenever the physical button is pressed, the doorbell camera transmits an unencrypted **UDP broadcast packet** on destination port **`20005`** across the local network to trigger its indoor wireless chime.
 
-This service intercepts that broadcast in real time, debounces burst packets, and translates the event into standardized **MQTT topics** consumed simultaneously by **Home Assistant** and **Scrypted (Apple HomeKit)** with zero cloud latency.
+This service intercepts that broadcast in real time, debounces burst packets, and translates the event into standardized **MQTT topics** consumed simultaneously by **Home Assistant** and **Scrypted (Apple HomeKit)** without cloud round-trips.
 
 ---
 

@@ -4,7 +4,7 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5.svg)](https://www.home-assistant.io/)
 [![Scrypted](https://img.shields.io/badge/Scrypted-HomeKit%20Chime-9b59b6.svg)](https://www.scrypted.app/)
 
-Zero-latency local MQTT event bridge for **TP-Link Tapo Video Doorbells** (Tapo D130, D235, and companion chimes).
+Local MQTT event bridge for **TP-Link Tapo Video Doorbells** (Tapo D130, D235, and companion chimes).
 
 Inspired by the original concept from [debian-D235-Doorbell-Press-MQTT](https://github.com/AriaGen/debian-D235-Doorbell-Press-MQTT) by AriaGen.
 

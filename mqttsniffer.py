@@ -86,7 +86,7 @@ def _print(text: str, color: str = "") -> None:
 def banner() -> None:
     _print("╔══════════════════════════════════════════╗", "cyan")
     _print("║  Tapo Doorbell MQTT Sniffer v1.0.0      ║", "cyan")
-    _print("║  Zero-latency doorbell events to MQTT   ║", "cyan")
+    _print("║  Local UDP to MQTT bridge   ║", "cyan")
     _print("╚══════════════════════════════════════════╝", "cyan")
     _print()
 
