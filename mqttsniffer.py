@@ -70,6 +70,45 @@ def on_disconnect(client, userdata, rc, properties=None, *args):
         print(f"[MQTT] Reconnect failed: {e}")
 
 
+# --- Color output helpers ---
+def _print(text: str, color: str = "") -> None:
+    colors = {
+        "red": "\033[91m", "green": "\033[92m", "yellow": "\033[93m",
+        "blue": "\033[94m", "magenta": "\033[95m", "cyan": "\033[96m",
+        "white": "\033[97m", "reset": "\033[0m",
+    }
+    if color in colors:
+        print(f"{colors[color]}{text}{colors['reset']}")
+    else:
+        print(text)
+
+
+def banner() -> None:
+    _print("╔══════════════════════════════════════════╗", "cyan")
+    _print("║  Tapo Doorbell MQTT Sniffer v1.0.0      ║", "cyan")
+    _print("║  Zero-latency doorbell events to MQTT   ║", "cyan")
+    _print("╚══════════════════════════════════════════╝", "cyan")
+    _print()
+
+    width = 46
+    def _line(label: str, value: str, color: str = "yellow") -> None:
+        padded_value = value.ljust(width - len(label) - 2)
+        _print(f"  {label}: {padded_value}", color)
+
+    _line("Broker", f"{MQTT_BROKER}:{MQTT_PORT}")
+    _line("User", f"{MQTT_USER or 'anonymous'}")
+    _line("Event topic", MQTT_TOPIC)
+    _line("UDP port", str(UDP_PORT))
+    _line("Pulse duration", f"{PULSE_TIME}s")
+    _line("Cooldown", f"{COOLDOWN_TIME}s")
+    if allowed_ips:
+        _line("Filter IPs", ", ".join(sorted(allowed_ips)))
+    else:
+        _line("Filter IPs", "ANY (auto-detect)")
+    _line("HA Discovery", "Enabled" if HA_DISCOVERY else "Disabled")
+    _print()
+
+
 # --- MQTT setup ---
 if hasattr(mqtt, "CallbackAPIVersion"):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -84,6 +123,7 @@ if MQTT_USER:
 
 client.will_set(AVAILABILITY_TOPIC, payload="offline", qos=1, retain=True)
 
+banner()
 print(f"[MQTT] Connecting to broker {MQTT_BROKER}:{MQTT_PORT} (user: {MQTT_USER or 'anonymous'})...")
 client.connect_async(MQTT_BROKER, MQTT_PORT)
 client.loop_start()
@@ -100,6 +140,8 @@ except (AttributeError, OSError):
 sock.bind(("", UDP_PORT))
 target_info = ", ".join(sorted(allowed_ips)) if allowed_ips else "ANY (auto-detect)"
 print(f"[UDP] Listening for broadcast packets on port {UDP_PORT} (Filtering for IP: {target_info})...")
+_print(f"  Status: ✓ Running (PID {os.getpid()})", "green")
+_print()
 
 last_press_time = 0.0
 
@@ -117,6 +159,7 @@ try:
             continue
 
         last_press_time = now
+        _print(f"  ✓ Doorbell detected at {sender_ip}:{addr[1]}", "green")
         print(f"[UDP] Packet from {addr[0]}:{addr[1]} ({len(data)} bytes) – Doorbell pressed!")
 
         # 1. Trigger ON state
