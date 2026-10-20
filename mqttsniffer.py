@@ -54,8 +54,9 @@ HA_DISCOVERY_PAYLOAD = json.dumps({
 def on_connect(client, userdata, flags, rc, properties=None):
     print(f"[MQTT] Connected with result code {rc}")
     client.publish(AVAILABILITY_TOPIC, payload="online", qos=1, retain=True)
-    client.publish(HA_DISCOVERY_TOPIC, payload=HA_DISCOVERY_PAYLOAD, qos=1, retain=True)
-    print(f"[MQTT] Published Home Assistant discovery config to {HA_DISCOVERY_TOPIC}")
+    if HA_DISCOVERY:
+        client.publish(HA_DISCOVERY_TOPIC, payload=HA_DISCOVERY_PAYLOAD, qos=1, retain=True)
+        print(f"[MQTT] Published Home Assistant discovery config to {HA_DISCOVERY_TOPIC}")
     client.publish(MQTT_TOPIC, payload="off", qos=1, retain=True)
     print(f"[MQTT] Published initial 'off' to {MQTT_TOPIC}")
 
